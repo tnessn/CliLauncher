@@ -1,0 +1,603 @@
+import { Button, CheckBox, ComboBox, LineEdit, ScrollView } from "std-widgets.slint";
+
+export struct ProjectRow {
+    id: string,
+    name: string,
+    path: string,
+    cli-id: string,
+    cli: string,
+    command-options: [string],
+    command-index: int,
+    session-options: [string],
+    session-index: int,
+    recent: string,
+    available: bool,
+    launchable: bool,
+}
+
+component ProjectCard inherits Rectangle {
+    in property <string> project-name;
+    in property <string> project-path;
+    in property <string> cli-id;
+    in property <string> cli-name;
+    in property <[string]> command-options;
+    in-out property <int> command-index;
+    in property <[string]> session-options;
+    in-out property <int> session-index;
+    in property <string> recent;
+    in property <bool> available;
+    in property <bool> launchable;
+    in property <bool> selected;
+    callback clicked;
+    callback command-selected(int);
+    callback session-selected(int);
+    callback launch-clicked;
+
+    height: 82px;
+    border-radius: 10px;
+    border-width: selected ? 2px : 1px;
+    border-color: selected ? #2563eb : #d6deea;
+    background: selected ? #e8f0ff : #ffffff;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 12px;
+
+        VerticalLayout {
+            spacing: 5px;
+            Text {
+                text: root.project-name;
+                color: #172033;
+                font-size: 16px;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Text {
+                text: root.project-path;
+                color: root.available ? #64748b : #b91c1c;
+                font-size: 12px;
+                overflow: elide;
+            }
+        }
+
+        Rectangle {
+            width: root.available ? 52px : 130px;
+            height: 42px;
+            border-radius: 10px;
+            border-width: 1px;
+            border-color: root.available ? #d6deea : #fecaca;
+            background: root.available ? #ffffff : #fee2e2;
+
+            if root.available && (root.cli-id == "codex" || root.cli-id == "claude" || root.cli-id == "gemini" || root.cli-id == "opencode"): Image {
+                width: 24px;
+                height: 24px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                source: root.cli-id == "codex" ? @image-url("../assets/agents/codex.png")
+                    : root.cli-id == "claude" ? @image-url("../assets/agents/claude.png")
+                    : root.cli-id == "gemini" ? @image-url("../assets/agents/gemini.png")
+                    : @image-url("../assets/agents/opencode.png");
+                image-fit: contain;
+                accessible-label: root.cli-name;
+            }
+
+            if root.available && !(root.cli-id == "codex" || root.cli-id == "claude" || root.cli-id == "gemini" || root.cli-id == "opencode"): Text {
+                text: "自定义";
+                color: #475569;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: 11px;
+            }
+
+            if !root.available: Text {
+                text: "路径不可用";
+                color: #b91c1c;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: 12px;
+            }
+        }
+
+        ComboBox {
+            width: 150px;
+            height: 42px;
+            model: root.command-options;
+            current-index <=> root.command-index;
+            enabled: root.available;
+            selected(value) => { root.command-selected(self.current-index); }
+        }
+
+        ComboBox {
+            width: 250px;
+            height: 42px;
+            model: root.session-options;
+            current-index <=> root.session-index;
+            enabled: root.available && root.session-options.length > 1;
+            selected(value) => { root.session-selected(self.current-index); }
+        }
+
+        Button {
+            width: 76px;
+            height: 42px;
+            text: "启动";
+            primary: true;
+            enabled: root.launchable;
+            clicked => { root.launch-clicked(); }
+        }
+
+        Text {
+            width: 110px;
+            text: root.recent;
+            color: #64748b;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            font-size: 12px;
+        }
+    }
+}
+
+component AgentMark inherits Rectangle {
+    in property <int> agent-index: -1;
+
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: #d6deea;
+    background: #ffffff;
+
+    if root.agent-index >= 0 && root.agent-index <= 3: Image {
+        width: 24px;
+        height: 24px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: root.agent-index == 0 ? @image-url("../assets/agents/codex.png")
+            : root.agent-index == 1 ? @image-url("../assets/agents/claude.png")
+            : root.agent-index == 2 ? @image-url("../assets/agents/gemini.png")
+            : @image-url("../assets/agents/opencode.png");
+        image-fit: contain;
+        accessible-label: root.agent-index == 0 ? "Codex"
+            : root.agent-index == 1 ? "Claude"
+            : root.agent-index == 2 ? "Gemini"
+            : "OpenCode";
+    }
+
+    if root.agent-index > 3: Text {
+        text: ">_";
+        color: #475569;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        font-size: 12px;
+        font-weight: 700;
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "CLI 启动器";
+    width: 1120px;
+    height: 740px;
+    background: #f3f6fb;
+    icon: @image-url("../assets/logo.png");
+
+    in property <[ProjectRow]> projects;
+    in-out property <int> selected-index: -1;
+    in-out property <string> search-text;
+    in-out property <string> status-text: "就绪";
+    in-out property <bool> drag-active: false;
+    in-out property <string> drag-status: "释放鼠标即可添加项目";
+
+    in-out property <bool> project-dialog-open: false;
+    in-out property <string> dialog-title: "添加项目";
+    in-out property <string> dialog-edit-id;
+    in-out property <string> dialog-path;
+    in-out property <int> dialog-cli-index: 0;
+    in-out property <string> dialog-command-one;
+    in-out property <string> dialog-command-two;
+
+    in-out property <bool> proxy-dialog-open: false;
+    in-out property <bool> proxy-enabled: false;
+    in-out property <string> proxy-host: "127.0.0.1";
+    in-out property <string> proxy-port: "7890";
+
+    in-out property <bool> remove-dialog-open: false;
+    in-out property <string> remove-project-id;
+    in-out property <string> remove-project-name;
+
+    callback search-changed(string);
+    callback project-command-changed(int, int);
+    callback project-session-changed(int, int);
+    callback launch-project(int);
+    callback terminal-selected;
+    callback folder-selected;
+    callback add-project;
+    callback edit-project;
+    callback repair-project;
+    callback remove-project;
+    callback confirm-remove;
+    callback open-proxy;
+    callback refresh-data;
+    callback browse-dialog-path;
+    callback save-project;
+    callback save-proxy;
+    callback test-proxy;
+
+    VerticalLayout {
+        padding: 22px;
+        spacing: 16px;
+
+        HorizontalLayout {
+            height: 52px;
+            spacing: 12px;
+            cross-axis-alignment: center;
+            Image {
+                width: 52px;
+                height: 52px;
+                source: @image-url("../assets/logo.png");
+                image-fit: contain;
+            }
+            VerticalLayout {
+                spacing: 2px;
+                Text {
+                    text: "CLI 启动器";
+                    color: #172033;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Button {
+                text: "刷新";
+                clicked => { root.refresh-data(); }
+            }
+            Button {
+                text: "代理设置";
+                clicked => { root.open-proxy(); }
+            }
+            Button {
+                text: "添加项目";
+                primary: true;
+                clicked => { root.add-project(); }
+            }
+        }
+
+        HorizontalLayout {
+            height: 42px;
+            spacing: 12px;
+            LineEdit {
+                horizontal-stretch: 1;
+                placeholder-text: "搜索项目名称或路径";
+                text <=> root.search-text;
+                edited(text) => { root.search-changed(text); }
+            }
+        }
+
+        Rectangle {
+            background: #edf2f7;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: #d8e0eb;
+            vertical-stretch: 1;
+
+            if root.projects.length == 0: Text {
+                text: root.search-text == "" ? "还没有项目，点击“添加项目”开始" : "没有匹配的项目";
+                color: #64748b;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: 15px;
+            }
+
+            ScrollView {
+                width: parent.width;
+                height: parent.height;
+                viewport-width: self.width;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    for project[index] in root.projects: ProjectCard {
+                        project-name: project.name;
+                        project-path: project.path;
+                        cli-id: project.cli-id;
+                        cli-name: project.cli;
+                        command-options: project.command-options;
+                        command-index: project.command-index;
+                        session-options: project.session-options;
+                        session-index: project.session-index;
+                        recent: project.recent;
+                        available: project.available;
+                        launchable: project.launchable;
+                        selected: root.selected-index == index;
+                        clicked => {
+                            root.selected-index = index;
+                        }
+                        command-selected(command-index) => {
+                            root.selected-index = index;
+                            root.project-command-changed(index, command-index);
+                        }
+                        session-selected(session-index) => {
+                            root.selected-index = index;
+                            root.project-session-changed(index, session-index);
+                        }
+                        launch-clicked => {
+                            root.selected-index = index;
+                            root.launch-project(index);
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            height: 38px;
+            spacing: 8px;
+            Button {
+                text: "终端";
+                enabled: root.selected-index >= 0;
+                clicked => { root.terminal-selected(); }
+            }
+            Button {
+                text: "文件管理器";
+                enabled: root.selected-index >= 0;
+                clicked => { root.folder-selected(); }
+            }
+            Button {
+                text: "编辑";
+                enabled: root.selected-index >= 0;
+                clicked => { root.edit-project(); }
+            }
+            Button {
+                text: "修复路径";
+                enabled: root.selected-index >= 0;
+                clicked => { root.repair-project(); }
+            }
+            Button {
+                text: "移除";
+                enabled: root.selected-index >= 0;
+                clicked => { root.remove-project(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: root.status-text;
+                color: #475569;
+                vertical-alignment: center;
+                horizontal-alignment: right;
+                overflow: elide;
+                font-size: 12px;
+            }
+        }
+    }
+
+    if root.drag-active: Rectangle {
+        x: 12px;
+        y: 12px;
+        width: parent.width - 24px;
+        height: parent.height - 24px;
+        background: #eff6ffee;
+        border-radius: 18px;
+        border-width: 3px;
+        border-color: #2563eb;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 12px;
+            Text {
+                text: "+";
+                color: #2563eb;
+                font-size: 52px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: "拖入文件夹添加项目";
+                color: #172033;
+                font-size: 22px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: root.drag-status;
+                color: #64748b;
+                font-size: 13px;
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+
+    if root.project-dialog-open: Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: #0f172a66;
+
+        Rectangle {
+            width: 610px;
+            height: 500px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: #ffffff;
+            border-radius: 14px;
+            border-width: 1px;
+            border-color: #d7dfeb;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 12px;
+
+                Text {
+                    text: root.dialog-title;
+                    color: #172033;
+                    font-size: 21px;
+                    font-weight: 700;
+                }
+                Text { text: "项目路径"; color: #64748b; }
+                HorizontalLayout {
+                    height: 40px;
+                    spacing: 8px;
+                    LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> root.dialog-path;
+                        read-only: true;
+                    }
+                    Button {
+                        text: "选择文件夹";
+                        clicked => { root.browse-dialog-path(); }
+                    }
+                }
+                Text { text: "默认 CLI"; color: #64748b; }
+                HorizontalLayout {
+                    height: 42px;
+                    spacing: 8px;
+                    AgentMark {
+                        agent-index: root.dialog-cli-index;
+                    }
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["Codex", "Claude", "Gemini", "OpenCode", "自定义命令"];
+                        current-index <=> root.dialog-cli-index;
+                    }
+                }
+                Text { text: "自定义命令（可选，每行一条）"; color: #64748b; }
+                LineEdit {
+                    placeholder-text: "例如：npm run dev";
+                    text <=> root.dialog-command-one;
+                }
+                LineEdit {
+                    placeholder-text: "例如：cargo run";
+                    text <=> root.dialog-command-two;
+                }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Rectangle { horizontal-stretch: 1; }
+                    Button {
+                        text: "取消";
+                        clicked => { root.project-dialog-open = false; }
+                    }
+                    Button {
+                        text: "保存";
+                        primary: true;
+                        clicked => { root.save-project(); }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.proxy-dialog-open: Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: #0f172a66;
+
+        Rectangle {
+            width: 500px;
+            height: 340px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: #ffffff;
+            border-radius: 14px;
+            border-width: 1px;
+            border-color: #d7dfeb;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 14px;
+                Text {
+                    text: "SOCKS5 代理";
+                    color: #172033;
+                    font-size: 21px;
+                    font-weight: 700;
+                }
+                CheckBox {
+                    text: "启动 CLI 时使用代理";
+                    checked <=> root.proxy-enabled;
+                }
+                Text { text: "代理主机"; color: #64748b; }
+                LineEdit { text <=> root.proxy-host; }
+                Text { text: "代理端口"; color: #64748b; }
+                LineEdit { text <=> root.proxy-port; input-type: number; }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Button {
+                        text: "测试连接";
+                        clicked => { root.test-proxy(); }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Button {
+                        text: "取消";
+                        clicked => { root.proxy-dialog-open = false; }
+                    }
+                    Button {
+                        text: "保存";
+                        primary: true;
+                        clicked => { root.save-proxy(); }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.remove-dialog-open: Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: #0f172a66;
+
+        Rectangle {
+            width: 460px;
+            height: 260px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: #ffffff;
+            border-radius: 14px;
+            border-width: 1px;
+            border-color: #d7dfeb;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 14px;
+
+                Text {
+                    text: "移除项目";
+                    color: #991b1b;
+                    font-size: 21px;
+                    font-weight: 700;
+                }
+                Text {
+                    text: "确认从启动器中移除“" + root.remove-project-name + "”？";
+                    color: #172033;
+                    font-size: 15px;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: "只会移除启动器记录，不会删除项目文件。";
+                    color: #64748b;
+                    font-size: 12px;
+                }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Rectangle { horizontal-stretch: 1; }
+                    Button {
+                        text: "取消";
+                        clicked => { root.remove-dialog-open = false; }
+                    }
+                    Button {
+                        text: "确认移除";
+                        primary: true;
+                        clicked => { root.confirm-remove(); }
+                    }
+                }
+            }
+        }
+    }
+}
