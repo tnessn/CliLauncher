@@ -8,6 +8,8 @@ contents="$app_dir/Contents"
 
 cd "$project_root"
 cargo build --release
+mkdir -p "$build_dir"
+touch "$build_dir/.metadata_never_index"
 rm -rf "$app_dir"
 mkdir -p "$contents/MacOS" "$contents/Resources"
 cp "$project_root/target/release/cli-launcher" "$contents/MacOS/CliLauncher"
@@ -45,13 +47,16 @@ printf '%s\n' \
   '  <key>CFBundleExecutable</key><string>CliLauncher</string>' \
   "$icon_key" \
   '  <key>CFBundlePackageType</key><string>APPL</string>' \
-  '  <key>CFBundleShortVersionString</key><string>0.1.0</string>' \
+  '  <key>CFBundleShortVersionString</key><string>0.1.1</string>' \
   '  <key>NSHighResolutionCapable</key><true/>' \
   '</dict></plist>' > "$contents/Info.plist"
 
 if [ -n "${APPLE_SIGN_IDENTITY:-}" ]; then
   codesign --force --deep --options runtime --sign "$APPLE_SIGN_IDENTITY" "$app_dir"
+else
+  codesign --force --deep --sign - "$app_dir"
 fi
+codesign --verify --deep --strict "$app_dir"
 
 rm -f "$build_dir/CliLauncher.dmg"
 hdiutil create -volname "CLI Launcher" -srcfolder "$app_dir" \
