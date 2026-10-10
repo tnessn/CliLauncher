@@ -249,15 +249,23 @@ fn open_terminal(path: &str, command_text: &str, proxy: &ProxyRuntime) -> Result
     {
         let shell = unix_terminal_script(path, command_text, proxy);
         let apple_script = format!(
-            "tell application \"iTerm2\"\n\
-                activate\n\
-                if (count of windows) = 0 then\n\
-                    create window with default profile\n\
-                else\n\
-                    tell current window to create tab with default profile\n\
-                end if\n\
-                tell current session of current window to write text \"{}\"\n\
-            end tell",
+            "set shellCommand to \"{}\"\n\
+            try\n\
+                tell application \"iTerm2\"\n\
+                    activate\n\
+                    if (count of windows) = 0 then\n\
+                        create window with default profile\n\
+                    else\n\
+                        tell current window to create tab with default profile\n\
+                    end if\n\
+                    tell current session of current window to write text shellCommand\n\
+                end tell\n\
+            on error\n\
+                tell application \"Terminal\"\n\
+                    activate\n\
+                    do script shellCommand\n\
+                end tell\n\
+            end try",
             apple_script_escape(&shell)
         );
         let output = Command::new("osascript")
@@ -268,7 +276,7 @@ fn open_terminal(path: &str, command_text: &str, proxy: &ProxyRuntime) -> Result
             Ok(())
         } else {
             Err(format!(
-                "无法打开 iTerm2：{}",
+                "无法打开 iTerm2 或系统终端：{}",
                 String::from_utf8_lossy(&output.stderr).trim()
             ))
         }

@@ -33,7 +33,29 @@ icon_key=''
 if iconutil -c icns "$iconset" -o "$contents/Resources/CliLauncher.icns" 2>/dev/null; then
   icon_key='  <key>CFBundleIconFile</key><string>CliLauncher</string>'
 else
-  printf '%s\n' 'Warning: icon conversion failed; packaging with the generic app icon.' >&2
+  python3 - "$iconset" "$contents/Resources/CliLauncher.icns" <<'PY'
+import pathlib
+import struct
+import sys
+
+iconset = pathlib.Path(sys.argv[1])
+icons = [
+    ("icp4", "icon_16x16.png"),
+    ("icp5", "icon_16x16@2x.png"),
+    ("icp6", "icon_32x32@2x.png"),
+    ("ic07", "icon_128x128.png"),
+    ("ic08", "icon_256x256.png"),
+    ("ic09", "icon_512x512.png"),
+    ("ic10", "icon_512x512@2x.png"),
+]
+chunks = b"".join(
+    kind.encode() + struct.pack(">I", len(data) + 8) + data
+    for kind, name in icons
+    for data in [(iconset / name).read_bytes()]
+)
+pathlib.Path(sys.argv[2]).write_bytes(b"icns" + struct.pack(">I", len(chunks) + 8) + chunks)
+PY
+  icon_key='  <key>CFBundleIconFile</key><string>CliLauncher</string>'
 fi
 rm -rf "$iconset"
 
