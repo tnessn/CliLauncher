@@ -10,6 +10,10 @@ on:
         description: Existing release tag to build and update
         required: true
         type: string
+      build_ref:
+        description: Branch or commit to build (defaults to the release tag)
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -20,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_ref || inputs.tag) || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build disk image
@@ -49,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_ref || inputs.tag) || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build Windows executable

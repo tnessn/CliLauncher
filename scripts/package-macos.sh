@@ -47,7 +47,7 @@ printf '%s\n' \
   '  <key>CFBundleExecutable</key><string>CliLauncher</string>' \
   "$icon_key" \
   '  <key>CFBundlePackageType</key><string>APPL</string>' \
-  '  <key>CFBundleShortVersionString</key><string>0.1.1</string>' \
+  '  <key>CFBundleShortVersionString</key><string>0.1.0</string>' \
   '  <key>NSHighResolutionCapable</key><true/>' \
   '</dict></plist>' > "$contents/Info.plist"
 
