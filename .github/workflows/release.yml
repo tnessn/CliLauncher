@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and update
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build disk image
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=/src --remap-path-prefix=$HOME=/home"
+          sh ./scripts/package-macos.sh
+
+      - name: Publish macOS package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" build/CliLauncher.dmg --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              build/CliLauncher.dmg \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          fi
+
+  windows:
+    needs: macos
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:GITHUB_WORKSPACE=/src --remap-path-prefix=$env:USERPROFILE=/home"
+          .\scripts\package-windows.ps1
+          Copy-Item -LiteralPath build/CliLauncher.exe -Destination build/CliLauncher-Windows-x64.exe -Force
+
+      - name: Upload Windows package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: gh release upload "$env:RELEASE_TAG" build/CliLauncher-Windows-x64.exe --clobber
