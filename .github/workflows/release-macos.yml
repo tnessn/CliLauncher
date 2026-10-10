@@ -18,7 +18,7 @@ jobs:
       - name: Build disk image
         run: |
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=/src --remap-path-prefix=$HOME=/home"
-          ./scripts/package-macos.sh
+          sh ./scripts/package-macos.sh
 
       - name: Publish release
         env:
