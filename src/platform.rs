@@ -171,19 +171,16 @@ pub fn launch_project(
             _ => return Err("自定义命令不支持选择历史会话".to_string()),
         }
     } else {
-        fallback_command(&resume, &fresh)
+        default_command(&resume, &fresh)
     };
     open_terminal(&project.path, &command, proxy)
 }
 
-fn fallback_command(resume: &str, fresh: &str) -> String {
+fn default_command(resume: &str, fresh: &str) -> String {
     if fresh.trim().is_empty() {
-        return resume.to_string();
-    }
-    if cfg!(target_os = "windows") {
-        format!("{resume}; if ($LASTEXITCODE -ne 0) {{ {fresh} }}")
+        resume.to_string()
     } else {
-        format!("{resume} || {fresh}")
+        fresh.to_string()
     }
 }
 
@@ -417,14 +414,10 @@ mod tests {
     }
 
     #[test]
-    fn fallback_command_matches_the_current_shell() {
-        let command = fallback_command("codex resume --last", "codex");
-        if cfg!(target_os = "windows") {
-            assert!(!command.contains("||"));
-            assert!(command.contains("$LASTEXITCODE"));
-        } else {
-            assert!(command.contains("||"));
-        }
+    fn default_command_starts_fresh_and_keeps_commands_without_a_new_mode() {
+        assert_eq!(default_command("codex resume --last", "codex"), "codex");
+        assert_eq!(default_command("claude --continue", "claude"), "claude");
+        assert_eq!(default_command("custom command", ""), "custom command");
     }
 
     #[cfg(target_os = "windows")]

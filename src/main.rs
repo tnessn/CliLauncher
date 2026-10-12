@@ -718,7 +718,7 @@ fn refresh_ui(window: &AppWindow, state: &Rc<RefCell<State>>, preferred_id: Opti
                 let (command_options, command_index) =
                     project_command_choices(&state.model, project);
                 let project_sessions = state.sessions.get(&project.id).cloned().unwrap_or_default();
-                let mut session_options = vec![SharedString::from("默认启动")];
+                let mut session_options = vec![SharedString::from("新建会话")];
                 session_options.extend(
                     project_sessions
                         .iter()
