@@ -1,56 +1,57 @@
 # CLI Launcher
 
-使用 Rust、Slint 和 Winit 构建的跨平台 CLI 项目启动器。界面代码在 Windows、macOS
-和 Linux 上共用，不依赖 WebView、Electron、Fyne 或 Win32 UI。
+A cross-platform CLI project launcher built with Rust, Slint, and Winit. The same UI
+code runs on Windows, macOS, and Linux without relying on WebView, Electron, Fyne, or Win32 UI.
 
-## 当前能力
+## Features
 
-- 读取并兼容现有 CliLauncher config.json
-- 添加、搜索、编辑、修复和移除项目
-- 检测 Codex、Claude、Gemini、OpenCode
-- 按项目启动 CLI、打开普通终端或文件管理器
-- 自定义命令
-- SOCKS5 检测及本地 HTTP 代理桥接
-- Windows、macOS、Linux 平台终端适配
-- 跨平台单实例文件锁
+- Reads and remains compatible with existing CliLauncher `config.json` files
+- Add, search, edit, repair, and remove projects
+- Detects Codex, Claude, Gemini, and OpenCode
+- Launches a CLI for a project, or opens a terminal or file manager
+- Supports custom commands
+- SOCKS5 detection and a local HTTP proxy bridge
+- Platform-specific terminal support for Windows, macOS, and Linux
+- Cross-platform single-instance file locking
 
-## 配置位置
+## Configuration Location
 
-- Windows：%APPDATA%\CliLauncher
-- macOS：~/Library/Application Support/CliLauncher
-- Linux：$XDG_CONFIG_HOME/CliLauncher，未设置时使用 ~/.config/CliLauncher
+- Windows: `%APPDATA%\CliLauncher`
+- macOS: `~/Library/Application Support/CliLauncher`
+- Linux: `$XDG_CONFIG_HOME/CliLauncher`, or `~/.config/CliLauncher` if unset
 
-配置结构与原版本相同。不同操作系统使用各自的标准配置目录。
+The configuration format is unchanged from the previous version. Each operating system uses its standard configuration directory.
 
-## 构建
+## Build
 
-需要稳定版 Rust 工具链。
+A stable Rust toolchain is required.
 
     cargo test --all-targets
     cargo build --release
 
-Windows：
+Windows:
 
     .\scripts\package-windows.ps1
 
-macOS：
+macOS:
 
     chmod +x scripts/package-macos.sh
     ./scripts/package-macos.sh
 
-脚本生成 build/CliLauncher.app 和 build/CliLauncher.dmg。正式分发前，
-需要在 macOS 上配置 Apple Developer 签名和公证。设置 APPLE_SIGN_IDENTITY 可让
-脚本执行 codesign。
+The script generates `build/CliLauncher.app` and `build/CliLauncher.dmg`. Before distributing,
+configure Apple Developer signing and notarization on macOS. Set `APPLE_SIGN_IDENTITY` to
+have the script run `codesign`.
 
-Linux：
+Linux:
 
     chmod +x scripts/package-linux.sh
     ./scripts/package-linux.sh
 
-Linux 文件选择器使用 XDG Desktop Portal；桌面环境还应提供可用终端模拟器，例如
-GNOME Terminal、Konsole、Kitty、Alacritty 或 xterm。
+The Linux file picker uses XDG Desktop Portal. The desktop environment should also provide
+a supported terminal emulator, such as GNOME Terminal, Konsole, Kitty, Alacritty, or xterm.
 
-## UI 后端
+## UI Backend
 
-Slint 使用 Winit 后端和软件渲染器，避免 WebView，同时在三个桌面平台共享界面。
-文件夹与消息对话框由 RFD 调用各平台原生能力。
+Slint uses the Winit backend and a software renderer, avoiding WebView while sharing the UI
+across all three desktop platforms. Folder and message dialogs use RFD to access each
+platform's native capabilities.
